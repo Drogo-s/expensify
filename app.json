@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Your trusted BudgetBuddy",
+    "slug": "BudgetBuddy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#ffffff"
+    },
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.betomoedano.BudgetBuddy"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.betomoedano.BudgetBuddy",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#8b5cf6",
+          "defaultChannel": "reminders"
+        }
+      ]
+    ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#8b5cf6",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Budget Buddy Reminders"
+    }
+  }
+}
