@@ -85,6 +85,27 @@ const CURRENCIES = [
 const STORAGE_KEY = '@reminders_data';
 const NOTIFICATION_TIME_KEY = '@notification_time';
 
+const EXPENSE_CATEGORIES = [
+  'Utilities',
+  'Electronics',
+  'Dining Out',
+  'Breakfast Supplies',
+  'Household Items',
+  'Christmas Gifts',
+  'New Year Party Supplies',
+  'Thanksgiving Groceries'
+];
+
+const INCOME_CATEGORIES = [
+  'Bonus',
+  'Consulting Work',
+  'Part-time Job',
+  'Online sales',
+  'Freelance Writing',
+  'End of Year Bonus',
+  'Thanksgiving Freelance'
+];
+
 // Exchange rates relative to KES (Kenyan Shilling as base)
 const EXCHANGE_RATES: { [key: string]: number } = {
   'KES': 1,
@@ -115,6 +136,7 @@ export default function ExpenseIncomeReminder({
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
@@ -436,11 +458,8 @@ export default function ExpenseIncomeReminder({
     );
   };
 
-  // Convert reminder amount to KES (base currency)
   const convertToKES = (amount: number, currency: string): number => {
     if (currency === 'KES') return amount;
-    
-    // Convert to KES: divide by the exchange rate
     const rate = EXCHANGE_RATES[currency] || 1;
     return amount / rate;
   };
@@ -470,7 +489,6 @@ export default function ExpenseIncomeReminder({
       return;
     }
 
-    // Find matching category (case-insensitive and trim whitespace)
     const reminderCategoryNormalized = reminder.category.trim().toLowerCase();
     const reminderType = reminder.type === 'expense' ? 'Expense' : 'Income';
     
@@ -488,7 +506,6 @@ export default function ExpenseIncomeReminder({
     });
 
     if (!category) {
-      // If exact match not found, try to find closest match
       const availableCategories = categories.filter(c => c.type === reminderType);
       const closeMatch = availableCategories.find(
         cat => cat.name.trim().toLowerCase().includes(reminderCategoryNormalized) ||
@@ -496,7 +513,6 @@ export default function ExpenseIncomeReminder({
       );
 
       if (closeMatch) {
-        // Found a close match, ask user to confirm
         Alert.alert(
           'Category Match',
           `Category "${reminder.category}" not found exactly, but found "${closeMatch.name}".\n\nUse "${closeMatch.name}" for this transaction?`,
@@ -523,33 +539,28 @@ export default function ExpenseIncomeReminder({
       return;
     }
 
-    // Create and finalize transaction
     await createTransactionAndFinalize(reminder, category);
   };
 
   const createTransactionAndFinalize = async (reminder: Reminder, category: { id: number; name: string; type: string }) => {
     try {
-      // Convert reminder amount to KES (base currency)
       const amountInKES = convertToKES(reminder.amount, reminder.currency);
       
-      // Create transaction in KES
       const transaction: Transaction = {
-        id: Date.now(), // Temporary ID, will be replaced by database
+        id: Date.now(),
         category_id: category.id,
-        amount: amountInKES, // Amount in KES
-        date: Math.floor(Date.now() / 1000), // Current timestamp in seconds
+        amount: amountInKES,
+        date: Math.floor(Date.now() / 1000),
         description: `${reminder.title} (from reminder - original: ${getCurrencySymbol(reminder.currency)}${reminder.amount.toFixed(2)} ${reminder.currency})`,
         type: reminder.type === 'expense' ? 'Expense' : 'Income',
       };
 
       console.log('Creating transaction:', transaction);
 
-      // Insert transaction into database
       await insertTransaction!(transaction);
       
       console.log('Transaction created successfully');
       
-      // Mark reminder as paid
       await finalizePayment(reminder, transaction.id);
       
       Alert.alert(
@@ -558,7 +569,6 @@ export default function ExpenseIncomeReminder({
         [{ text: 'OK' }]
       );
 
-      // Notify parent component to refresh data
       if (onReminderPaid) {
         onReminderPaid(reminder);
       }
@@ -1102,7 +1112,7 @@ export default function ExpenseIncomeReminder({
                   styles.typeButton,
                   formData.type === 'expense' && styles.typeButtonActive,
                 ]}
-                onPress={() => setFormData({ ...formData, type: 'expense' })}
+                onPress={() => setFormData({ ...formData, type: 'expense', category: '' })}
               >
                 <Text
                   style={[
@@ -1118,7 +1128,7 @@ export default function ExpenseIncomeReminder({
                   styles.typeButton,
                   formData.type === 'income' && styles.typeButtonActive,
                 ]}
-                onPress={() => setFormData({ ...formData, type: 'income' })}
+                onPress={() => setFormData({ ...formData, type: 'income', category: '' })}
               >
                 <Text
                   style={[
@@ -1136,9 +1146,12 @@ export default function ExpenseIncomeReminder({
               style={styles.input}
               onPress={() => setShowCurrencyPicker(true)}
             >
-              <Text style={styles.inputText}>
-                {getCurrencySymbol(formData.currency)} {formData.currency}
-              </Text>
+              <View style={styles.categoryInputContainer}>
+                <Text style={styles.inputText}>
+                  {getCurrencySymbol(formData.currency)} {formData.currency}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </View>
             </TouchableOpacity>
 
             <Text style={styles.label}>Amount</Text>
@@ -1159,14 +1172,17 @@ export default function ExpenseIncomeReminder({
             />
 
             <Text style={styles.label}>Category</Text>
-            <TextInput
+            <TouchableOpacity
               style={styles.input}
-              value={formData.category}
-              onChangeText={(text) =>
-                setFormData({ ...formData, category: text })
-              }
-              placeholder="e.g., Housing"
-            />
+              onPress={() => setShowCategoryPicker(true)}
+            >
+              <View style={styles.categoryInputContainer}>
+                <Text style={[styles.inputText, !formData.category && styles.placeholderText]}>
+                  {formData.category || 'Select a category'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </View>
+            </TouchableOpacity>
 
             <Text style={styles.label}>Due Date (YYYY-MM-DD)</Text>
             <TextInput
@@ -1233,6 +1249,49 @@ export default function ExpenseIncomeReminder({
                   <Text style={styles.currencyItemName}>{currency.name}</Text>
                 </View>
                 <Text style={styles.currencyItemSymbol}>{currency.symbol}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Category Picker Modal */}
+      <Modal
+        visible={showCategoryPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              Select {formData.type === 'expense' ? 'Expense' : 'Income'} Category
+            </Text>
+            <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+              <Ionicons name="close" size={28} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView>
+            {(formData.type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryPickerItem,
+                  formData.category === category && styles.categoryPickerItemSelected
+                ]}
+                onPress={() => {
+                  setFormData({ ...formData, category });
+                  setShowCategoryPicker(false);
+                }}
+              >
+                <Text style={[
+                  styles.categoryPickerText,
+                  formData.category === category && styles.categoryPickerTextSelected
+                ]}>
+                  {category}
+                </Text>
+                {formData.category === category && (
+                  <Ionicons name="checkmark-circle" size={24} color="#0050A0" />
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1815,6 +1874,33 @@ const styles = StyleSheet.create({
   },
   currencyItemSymbol: {
     fontSize: 24,
+    color: '#0050A0',
+  },
+  categoryInputContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#9ca3af',
+  },
+  categoryPickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  categoryPickerItemSelected: {
+    backgroundColor: '#E6F3FF',
+  },
+  categoryPickerText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  categoryPickerTextSelected: {
+    fontWeight: 'bold',
     color: '#0050A0',
   },
 });
